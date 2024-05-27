@@ -148,7 +148,7 @@ for ip in ip_list:
     # Extract stack member count from 'show switch detail' output
     stack_lines = sh_stack_output.split('\n')
     for line in stack_lines:
-        if line.strip().startswith('*') or re.match(r'\s+\d+', line.strip()):
+        if 'Active' in line or 'Standby' in line:
             stack_members += 1
 
     # Ensure all elements are strings before appending to devices list
