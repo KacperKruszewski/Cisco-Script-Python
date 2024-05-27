@@ -20,7 +20,7 @@ devices = []
 #clearing the old data from the CSV file and writing the headers
 print(f"Create file IOS.csv")
 with open("IOS.csv", "w+") as f:
-    f.write("IP Address;Hostname;Uptime;Current_Version;Current_Image;Serial_Number;Device_Model;Device_Memory;Device_Time;SSH_Version;NTP_Status;STP_Mode;Power_Supplies\n")
+    f.write("IP Address;Hostname;Uptime;Current_Version;Current_Image;Serial_Number;Device_Model;Device_Memory;Device_Time;SSH_Version;NTP_Status;STP_Mode;Power_Supplies;Stack_Uptime\n")
 
 #clearing the old data from the CSV file and writing the headers
 print(f"Create file login_issues.csv")
@@ -71,6 +71,7 @@ for ip in ip_list:
     sh_ntp_output = net_connect.send_command('show ntp status')  # Get NTP status information
     sh_stp_output = net_connect.send_command('show spanning-tree')  # Get STP mode information
     sh_inv_output = net_connect.send_command('show inventory')  # Get inventory information including power supplies
+    sh_stack_output = net_connect.send_command('show switch detail')  # Get stack information
 
     output_lines = sh_ver_output.split('\n')
 
@@ -86,6 +87,7 @@ for ip in ip_list:
     ntp_status = None  # Variable for storing NTP status
     stp_mode = None  # Variable for storing STP mode
     power_supplies = []  # List for storing power supply information
+    stack_uptime = []  # List for storing stack member uptime information
 
     for line in output_lines:
         if ' uptime is ' in line:
@@ -143,8 +145,17 @@ for ip in ip_list:
     # Convert power supplies list to a string
     power_supplies_str = ', '.join(power_supplies) if power_supplies else 'No power supplies found'
 
+    # Extract stack member uptime from 'show switch detail' output
+    stack_lines = sh_stack_output.split('\n')
+    for line in stack_lines:
+        if 'Uptime' in line:
+            stack_uptime.append(line.strip())
+
+    # Convert stack uptime list to a string
+    stack_uptime_str = '; '.join(stack_uptime) if stack_uptime else 'No stack information found'
+
     # Ensure all elements are strings before appending to devices list
-    devices.append([str(ip), str(hostname), str(uptime), str(version), str(ios), str(serial), str(model), str(memory), str(device_time), str(ssh_version), str(ntp_status), str(stp_mode), power_supplies_str])
+    devices.append([str(ip), str(hostname), str(uptime), str(version), str(ios), str(serial), str(model), str(memory), str(device_time), str(ssh_version), str(ntp_status), str(stp_mode), power_supplies_str, stack_uptime_str])
 
     print(f"Data read from {ip}. Disconnecting...")
     net_connect.disconnect()
