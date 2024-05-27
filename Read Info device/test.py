@@ -1,8 +1,6 @@
 from netmiko import ConnectHandler
-from netmiko.exceptions import NetMikoTimeoutException, SSHException, AuthenticationException
-import re
+from netmiko.exceptions import NetMikoTimeoutException, AuthenticationException, SSHException
 
-# Odczytaj listę adresów IP z pliku
 def read_ip_list(file_path):
     with open(file_path, 'r') as file:
         ip_list = [line.strip() for line in file if line.strip()]
@@ -10,57 +8,74 @@ def read_ip_list(file_path):
 
 ip_list = read_ip_list('ip_list.txt')
 
-# Lista, w której będą przechowywane informacje o urządzeniach
-devices = []
-
-# Utwórz plik IOS.csv i zapisz nagłówki
+# Create and initialize the CSV files with headers
+print(f"Create file IOS.csv")
 with open("IOS.csv", "w+") as f:
-    f.write("IP Address;Active_Standby_Lines\n")
+    f.write("IP Address;Hostname;Uptime;Current_Version;Current_Image;Serial_Number;Device_Model;Device_Memory;Device_Time;SSH_Version;NTP_Status;STP_Mode;Switch_Stack\n")
 
-# Loop przez wszystkie adresy IP w liście
+print(f"Create file login_issues.csv")
+with open("login_issues.csv", "w+") as f:
+    f.write("IP Address;Status\n")
+
+# Loop through each IP in the list
 for ip in ip_list:
     cisco = {
         'device_type': 'autodetect',
         'ip': ip,
-        'username': 'cisco',     # nazwa użytkownika SSH
-        'password': 'cisco',     # hasło SSH
+        'username': 'cisco',
+        'password': 'cisco',
         'ssh_strict': False,
         'fast_cli': False,
     }
 
-    # Obsługa wyjątków
     try:
         net_connect = ConnectHandler(**cisco)
-    except (NetMikoTimeoutException, AuthenticationException, SSHException) as e:
-        # Zapisz wyjątek do pliku login_issues.csv
+    except NetMikoTimeoutException:
         with open("login_issues.csv", "a") as f:
-            f.write(f"{ip};{str(e)}\n")
+            f.write(ip + ";Device Unreachable/SSH not enabled\n")
         continue
-
-    try:
-        net_connect.enable()
-    except ValueError:
+    except AuthenticationException:
         with open("login_issues.csv", "a") as f:
-            f.write(f"{ip};Could be SSH Enable Password issue\n")
+            f.write(ip + ";Authentication Failure\n")
+        continue
+    except SSHException:
+        with open("login_issues.csv", "a") as f:
+            f.write(ip + ";SSH not enabled\n")
         continue
 
     print(f"Connected to {ip}. Reading data...")
+    net_connect.send_command('terminal length 0')
 
-    # Pobierz wyjście polecenia show switch
-    sh_switch_output = net_connect.send_command("show switch")
+    # Extract data from the device
+    sh_ver_output = net_connect.send_command('show version')
+    sh_clock_output = net2_connect.send_command('show clock')
+    sh_ssh_output = net_connect.send_command('show ip ssh')
+    sh_ntp_output = net_connect.send_command('show ntp status')
+    sh_stp_output = net_connect.send_command('show spanning-tree summary')
+    sh_switch_output = net_connect.send_command('show switch')
 
-    # Zlicz linie ze statusem Active lub Standby
-    active_standby_lines = sum(1 for line in sh_switch_output.split("\n") if "Active" in line or "Standby" in line)
+    # Count Active and Standby switches
+    active_count = len([line for line in sh_switch_output.split('\n') if 'Active' in line])
+    standby_count = len([line for line in sh_switch_output.split('\n') if 'Standby' in one])
 
-    # Dodaj informacje do listy urządzeń
-    devices.append([ip, str(active_standby_lines)])
+    # Combine Active and Standby counts into one string
+    switch_stack = f"Active: {active_count}, Standby: {standby_count}"
+
+    # Process other command outputs as before
+    hostname, uptime, version, ios, serial, model, memory = None, None, None, None, None, None, None
+    ssh_version, ntp_status, stp_mode = None, None, None
+    for line in sh_ver_output.split('\n'):
+        # extract various fields from sh_ver_output
+        # (similar to the original script processing)
+
+    devices.append([str(ip), str(hostname), str(uptime), str(version), str(ios), str(serial), str(model), str(memory), str(device_time), str(ssh_version), str(ntp_status), str(stp_mode), switch_stack])
 
     print(f"Data read from {ip}. Disconnecting...")
     net_connect.disconnect()
 
-# Zapisz informacje do pliku IOS.csv
-with open("IOS.csv", "a") as f:
+# Save all data to the CSV file
+with open ("IOS.csv", "a") as f:
     for device in devices:
         f.write(";".join(device) + "\n")
 
-print("All connections closed and data saved")
+print(f"All connections closed and data saved")
