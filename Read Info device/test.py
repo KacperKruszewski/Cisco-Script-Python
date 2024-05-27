@@ -148,7 +148,7 @@ for ip in ip_list:
     # Extract stack member count from 'show switch detail' output
     stack_lines = sh_stack_output.split('\n')
     for line in stack_lines:
-        if 'Switch' in line and 'Role' in line:
+        if line.strip().startswith('*') or re.match(r'\s+\d+', line.strip()):
             stack_members += 1
 
     # Ensure all elements are strings before appending to devices list
@@ -157,9 +157,3 @@ for ip in ip_list:
     print(f"Data read from {ip}. Disconnecting...")
     net_connect.disconnect()
     
-#print all results (for all routers) on screen    
-with open ("IOS.csv", "a") as f:
-    for device in devices:
-        f.write(";".join(device) + "\n")
-
-print(f"All connections closed and data saved")
